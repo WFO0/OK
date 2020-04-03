@@ -1,0 +1,245 @@
+#include<Windows.h>
+
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+HINSTANCE g_hInst;
+HWND hWndMain;
+LPCTSTR lpszClass = TEXT("겜플2A 이현수");
+#define MAXROW 21
+#define MAXCOL 21
+#define CX 40
+
+static int filed[MAXCOL][MAXROW] = { 0, };
+
+
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE
+	hPrevInstance, LPSTR lpszCmdParam, int nCmdShow)
+{
+	HWND hWnd;
+	MSG Message;
+	WNDCLASS WndClass;
+	g_hInst = hInstance;
+
+	WndClass.cbClsExtra = 0;
+	WndClass.cbWndExtra = 0;
+	WndClass.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
+	WndClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+	WndClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+	WndClass.hInstance = hInstance;
+	WndClass.lpfnWndProc = WndProc;
+	WndClass.lpszClassName = lpszClass;
+	WndClass.lpszMenuName = NULL;
+	WndClass.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
+	RegisterClass(&WndClass);
+
+	hWnd = CreateWindow(lpszClass, lpszClass, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 900,
+		900,
+		NULL, (HMENU)NULL, hInstance, NULL);
+	ShowWindow(hWnd, nCmdShow);
+
+	while (GetMessage(&Message, NULL, 0, 0)) {
+		TranslateMessage(&Message);
+		DispatchMessage(&Message);
+	}
+	return Message.wParam;
+}
+
+LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM IParam)
+{
+	HDC hdc;
+	hdc = GetDC(hWnd);
+	PAINTSTRUCT ps;
+	HBRUSH hBrush, oldBrush;
+
+
+	static bool GAME = TRUE;            //게임이 실행되는 동안 true
+	static bool COUNTING = TRUE;         //연속된 5개의 돌이 나오면 false로 봐뀌고 게임 종료 부분으로 넘어감
+	static int turn = 0;
+	static int count = 0;            //연속되는 돌의 갯수를 세고 저장하는 변수
+
+	static int x = 20;//세로줄
+	static int y = 20;//가로줄
+
+
+	switch (iMessage)
+	{
+	case WM_PAINT://그리기
+		hdc = BeginPaint(hWnd, &ps);
+		if (true)//아랫키를 눌렀을때 세로줄을 그리기위해 for문을 돌린다.
+		{
+			for (int i = 0; i < 18; i++)
+			{
+				x += 40;
+				MoveToEx(hdc, x, 60, NULL);
+				LineTo(hdc, x, 740);
+
+			}
+		}
+		if (true)//오른쪽키를 눌렀을때 가로줄을 그리기위해서 for문을 돌린다.
+		{
+			for (int j = 0; j < 18; j++)
+			{
+				y += 40;
+				MoveToEx(hdc, 60, y, NULL);
+				LineTo(hdc, 740, y);
+
+			}
+		}
+		EndPaint(hWnd, &ps);
+		return 0;
+		InvalidateRect(hWnd, NULL, FALSE);//세로줄과 가로줄을 겹치기위해 FALSE를 쓴다.
+		return 0;
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		return 0;
+	}
+	switch (iMessage)
+	{
+	case WM_LBUTTONDOWN:
+		int XP = LOWORD(IParam) / CX;	//x좌표를 40으로 나눔
+		int YP = HIWORD(IParam) / CX;	//y좌표를 40으로 나눔
+
+		int X = XP;
+		int Y = YP;
+
+		hdc = GetDC(hWnd);
+		if (turn % 2 == 0)
+			hBrush = CreateSolidBrush(RGB(0, 0, 0));
+		else
+			hBrush = CreateSolidBrush(RGB(255, 255, 255));
+
+		oldBrush = (HBRUSH)SelectObject(hdc, hBrush);
+
+
+
+		if ((X < 19) && (Y < 19)) {
+			if (filed[Y][X] == 0)
+			{
+				Ellipse(hdc, XP * 40, YP * 40, (XP * 40) + 40, (YP * 40) + 40);			//원 생성
+
+				filed[Y][X] = (turn % 2) + 1;   //2로 나눈 나머지에 1을 더해서 입력받은 좌표에 저장한다. 
+
+
+				int n = 1;
+				while (n < 5 && COUNTING) {
+					if (Y - n < 0)            //현재 입력 받은 y좌표값에서 n만큼 위로 움직여서 검사를 했을 때, 필드를 벗어나면 검사를 중단
+						break;
+					else if (filed[Y - n][X] == ((turn % 2) + 1))   //현재 좌표에 저장된 값과, 검사하는 좌표에 저장된 값이 동일하면 count++
+						count++;
+					else                  //동일하지 않으면 검사를 중단
+						break;
+					n++;
+				};
+
+				n = 1;
+				while (n < 5 && COUNTING) {
+					if (Y + n > 24)            //마찬가지로 하되 이번엔 아래로 움직여서 검사.
+						break;
+					else if (filed[Y + n][X] == ((turn % 2) + 1))
+						count++;
+					else
+						break;
+					n++;
+				};
+
+				if (count == 4) {            //현재 놓은 돌을 제외하고 y축 기준 위 아래로 같은 돌 4개가 이어져 있으면, 오목이 완성이므로
+					GAME = FALSE;            //20번째 줄의 do while반복문을 종료하도록 false로 설정
+					COUNTING = FALSE;         //아래에 있는 검사들도 하지 않도록 false로 설정
+				}
+				count = 0;
+
+				n = 1;
+				while (n < 5 && COUNTING) {
+					if (X - n < 0)
+						break;
+					else if (filed[Y][X - n] == ((turn % 2) + 1))
+						count++;
+					else
+						break;
+					n++;
+				};
+
+				n = 1;
+				while (n < 5 && COUNTING) {
+					if (X + n > 24)
+						break;
+					else if (filed[Y][X + n] == ((turn % 2) + 1))
+						count++;
+					else
+						break;
+					n++;
+				};
+
+				if (count == 4) {            
+					GAME = FALSE;            
+					COUNTING = FALSE;     
+				}
+				count = 0;
+
+				n = 1;
+				while (n < 5 && COUNTING) {
+					if (Y - n < 0 || X - n < 0)
+						break;
+					else if (filed[Y - n][X - n] == ((turn % 2) + 1))
+						count++;
+					else
+						break;
+					n++;
+				};
+
+				n = 1;
+				while (n < 5 && COUNTING) {
+					if (Y + n > 24 || X + n > 24)
+						break;
+					else if (filed[Y + n][X + n] == ((turn % 2) + 1))
+						count++;
+					else
+						break;
+					n++;
+				};
+				if (count == 4) {            
+					GAME = FALSE;            
+					COUNTING = FALSE;        
+				}
+
+				n = 1;
+				while (n < 5 && COUNTING) {
+					if (Y + n < 0 || X - n < 0)
+						break;
+					else if (filed[Y + n][X - n] == ((turn % 2) + 1))
+						count++;
+					else
+						break;
+					n++;
+				};
+
+				n = 1;
+				while (n < 5 && COUNTING) {
+					if (Y - n > 24 || X + n > 24)
+						break;
+					else if (filed[Y - n][X + n] == ((turn % 2) + 1))
+						count++;
+					else
+						break;
+					n++;
+				};
+				if (count == 4) {           
+					GAME = FALSE;          
+					COUNTING = FALSE;         
+				}
+				if (GAME == FALSE)
+					Ellipse(hdc, 100, 100, 500, 500); //승리시 원색상 표현
+
+				turn++;
+
+			}
+			
+		}
+		
+		SelectObject(hdc, oldBrush);
+		DeleteObject(hBrush);
+		EndPaint(hWnd, &ps);
+
+		return 0;
+	}
+	return(DefWindowProc(hWnd, iMessage, wParam, IParam));
+}
